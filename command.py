@@ -24,11 +24,11 @@ class CommandGroup(commands.Cog):
         original_name = channel.name
 
         if '| ⏱️' in original_name:
-            original_name = original_name.split(' | ⏱️')[0]
+            original_name = original_name.split('┃⏱️')[0]
 
         new_name = original_name
         if duration_str:
-            new_name = f"{original_name} | ⏱️{duration_str}"
+            new_name = f"{original_name}┃⏱️{duration_str}"
 
         if new_name != channel.name:
             try:
@@ -126,6 +126,8 @@ class CommandGroup(commands.Cog):
                 content=f"An error occurred: {str(e)}",
                 ephemeral=True,
             )
+
+
 
 
 async def setup(bot: commands.Bot) -> None:
