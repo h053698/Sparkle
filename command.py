@@ -12,6 +12,32 @@ class CommandGroup(commands.Cog):
         self.auto_delete_channels = {}
         self.message_delete_tasks = {}
 
+    def cog_unload(self) -> None:
+        for task in self.message_delete_tasks.values():
+            task.cancel()
+
+    async def _update_channel_name(self, channel_id: int, duration_str: str = None) -> None:
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            return
+
+        original_name = channel.name
+
+        if '| ⏱️' in original_name:
+            original_name = original_name.split(' | ⏱️')[0]
+
+        new_name = original_name
+        if duration_str:
+            new_name = f"{original_name} | ⏱️{duration_str}"
+
+        if new_name != channel.name:
+            try:
+                await channel.edit(name=new_name)
+            except Exception as e:
+                print(f"알 수 없는 오류 발생: 채널 '{original_name}' 이름 변경 실패: {e}")
+
+
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot:
@@ -58,6 +84,7 @@ class CommandGroup(commands.Cog):
         if time_command == "off":
             if target_channel_id in self.auto_delete_channels:
                 del self.auto_delete_channels[target_channel_id]
+                await self._update_channel_name(target_channel_id, None)
                 await interaction.followup.send(
                     f"Auto-delete has been **disabled** for this channel.",
                 )
@@ -85,6 +112,7 @@ class CommandGroup(commands.Cog):
                 )
 
             self.auto_delete_channels[target_channel_id] = seconds
+            await self._update_channel_name(target_channel_id, time)
             await interaction.followup.send(
                 f"Auto-delete has been set to **{time}** for this channel.",
             )
