@@ -9,8 +9,6 @@ from discord import app_commands, TextChannel
 
 from faker import Faker
 
-from permission import guild_install_only_command
-
 logger = logging.getLogger("command")
 
 
@@ -119,7 +117,7 @@ class CommandGroup(commands.Cog):
         same_name="Enable ghost mode for members with the same name",
         with_admin="Enable ghost mode for admins too",
     )
-    @guild_install_only_command()
+    @app_commands.allowed_installs(guilds=True, users=False)
     async def nickname_ghost_mode(
         self,
         interaction: discord.Interaction,
@@ -279,7 +277,6 @@ class CommandGroup(commands.Cog):
                 content=f"An error occurred while activating ghost mode: {str(e)}",
                 ephemeral=True,
             )
-            # 오류 발생 시 고스트 모드 상태 초기화
             if target_guild.id in self.ghost_mode_original_nicks:
                 del self.ghost_mode_original_nicks[target_guild.id]
             if target_guild.id in self.is_ghost_mode_active:
@@ -289,7 +286,10 @@ class CommandGroup(commands.Cog):
         name="auto-delete",
         description="Automatically delete messages after a specified time.",
     )
-    @guild_install_only_command()
+    @app_commands.describe(
+        time="Time after which messages will be deleted (e.g., '5s', '5m', '5h', or 'off')",
+    )
+    @app_commands.allowed_installs(guilds=True, users=False)
     async def auto_delete_message(
         self,
         interaction: discord.Interaction,
