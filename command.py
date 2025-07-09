@@ -9,6 +9,8 @@ from discord import app_commands, TextChannel
 
 from faker import Faker
 
+from permission import guild_install_only_command
+
 logger = logging.getLogger("command")
 
 
@@ -114,12 +116,15 @@ class CommandGroup(commands.Cog):
     )
     @app_commands.describe(
         duration="Duration of ghost mode (in seconds, or 'off')",
+        same_name="Enable ghost mode for members with the same name",
         with_admin="Enable ghost mode for admins too",
     )
+    @guild_install_only_command()
     async def nickname_ghost_mode(
         self,
         interaction: discord.Interaction,
         duration: str = None,
+        same_name: bool = False,
         with_admin: bool = True,
     ) -> None:
         await interaction.response.defer()
@@ -152,7 +157,7 @@ class CommandGroup(commands.Cog):
                     self.ghost_mode_restore_tasks[target_guild.id].cancel()
                     del self.ghost_mode_restore_tasks[target_guild.id]
                 await self._restore_nicknames(target_guild)
-                await interaction.message.reply(
+                await interaction.channel.send(
                     "All nicknames have been restored.",
                 )
             else:
@@ -207,13 +212,14 @@ class CommandGroup(commands.Cog):
 
                 self.ghost_mode_original_nicks[target_guild.id][member.id] = member.nick
 
-                new_nick = self.faker.name()
-                if len(new_nick) > 32:
-                    new_nick = self.faker.first_name() + str(
-                        random.randint(10, 99)
-                    )  # 너무 길면 짧게
+                if not same_name:
+                    new_nick = self.faker.name()
                     if len(new_nick) > 32:
-                        new_nick = new_nick[:32]
+                        new_nick = self.faker.first_name() + str(random.randint(10, 99))
+                        if len(new_nick) > 32:
+                            new_nick = new_nick[:32]
+                else:
+                    new_nick = "Anonymous"
 
                 try:
                     logger.info(
@@ -264,7 +270,7 @@ class CommandGroup(commands.Cog):
                 )
 
             await interaction.followup.send(
-                f"## Ghost mode has been **activated** for this server.\n"
+                f"## Ghost mode has been **activated** for this server. ({duration})"
             )
 
         except Exception as e:
@@ -283,6 +289,7 @@ class CommandGroup(commands.Cog):
         name="auto-delete",
         description="Automatically delete messages after a specified time.",
     )
+    @guild_install_only_command()
     async def auto_delete_message(
         self,
         interaction: discord.Interaction,
@@ -324,7 +331,7 @@ class CommandGroup(commands.Cog):
                     "Time must be greater than 0 (or use 'off' to disable)."
                 )
 
-            if seconds > 172800:  # 2 days in seconds
+            if seconds > 172800:
                 raise ValueError("Maximum time limit is 2 days (172800 seconds).")
 
             self.auto_delete_channels[target_channel.id] = seconds
