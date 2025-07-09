@@ -112,10 +112,15 @@ class CommandGroup(commands.Cog):
         name="ghostmode",
         description="Hide guild members nicknames from the server. (anti-capture)",
     )
+    @app_commands.describe(
+        duration="Duration of ghost mode (in seconds, or 'off')",
+        with_admin="Enable ghost mode for admins too",
+    )
     async def nickname_ghost_mode(
         self,
         interaction: discord.Interaction,
         duration: str = None,
+        with_admin: bool = True,
     ) -> None:
         await interaction.response.defer()
         target_guild = interaction.guild
@@ -170,32 +175,35 @@ class CommandGroup(commands.Cog):
         changed_count = 0
         skipped_count = 0
 
-        logger.info(f"Activating ghost mode for guild: {target_guild.name} (ID: {target_guild.id})")
+        logger.info(
+            f"Activating ghost mode for guild: {target_guild.name} (ID: {target_guild.id})"
+        )
         if len(target_guild.members) == 1:
             await target_guild.chunk()
         try:
-            print("aaaa")
             for member in target_guild.members:
-                logger.info("Processing member: %s (ID: %s)", member.display_name, member.id)
+                logger.info(
+                    "Processing member: %s (ID: %s)", member.display_name, member.id
+                )
                 if member == self.bot.user:
                     continue
 
-                # if (
-                #     target_guild.me.top_role.position <= member.top_role.position
-                #     and member != target_guild.owner
-                # ):
-                #     logger.warning(
-                #         f"Skipping nickname change for {member.display_name} (ID: {member.id}) due to role hierarchy."
-                #     )
-                #     skipped_count += 1
-                #     continue
+                if (
+                    target_guild.me.top_role.position <= member.top_role.position
+                    and member != target_guild.owner
+                ):
+                    logger.warning(
+                        f"Skipping nickname change for {member.display_name} (ID: {member.id}) due to role hierarchy."
+                    )
+                    skipped_count += 1
+                    continue
 
-                # if member.guild_permissions.administrator:
-                #     logger.info(
-                #         f"Skipping nickname change for administrator {member.display_name} (ID: {member.id})."
-                #     )
-                #     skipped_count += 1
-                #     continue
+                if member.guild_permissions.administrator and not with_admin:
+                    logger.info(
+                        f"Skipping nickname change for administrator {member.display_name} (ID: {member.id})."
+                    )
+                    skipped_count += 1
+                    continue
 
                 self.ghost_mode_original_nicks[target_guild.id][member.id] = member.nick
 
@@ -208,7 +216,9 @@ class CommandGroup(commands.Cog):
                         new_nick = new_nick[:32]
 
                 try:
-                    logger.info(f"Changing nickname for {member.display_name} (ID: {member.id}) to {new_nick}")
+                    logger.info(
+                        f"Changing nickname for {member.display_name} (ID: {member.id}) to {new_nick}"
+                    )
                     await member.edit(nick=new_nick)
                     changed_count += 1
                     await asyncio.sleep(0.5)
