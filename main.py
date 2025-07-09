@@ -1,13 +1,16 @@
 import os
+import logging
 from asyncio import run
 
 from discord.ext import commands
 from discord import AllowedMentions, Intents
 
-from command import CommandGroup
 from core.env_validator import get_settings
 
 settings = get_settings()
+logging.basicConfig(level=logging.DEBUG)
+
+logger = logging.getLogger("sparkle")
 
 
 class Sparkle(commands.Bot):
@@ -25,12 +28,13 @@ class Sparkle(commands.Bot):
         )
 
     async def on_ready(self) -> None:
-        print(f"Logged in as {self.user.name} (ID: {self.user.id})")
+        logger.info(f"Logged in as {self.user.name} (ID: {self.user.id})")
 
     async def setup_hook(self) -> None:
-        print("loading command group")
         await self.load_extension("command")
+        logger.info("Command extension loaded successfully.")
         await self.tree.sync()
+        logger.info("Command tree synced successfully.")
 
 
 async def main() -> None:

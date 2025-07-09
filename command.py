@@ -1,42 +1,23 @@
 import asyncio
+import logging
 
 import discord
-from datetime import timedelta
+from datetime import timedelta, datetime
 from discord.ext import commands
-from discord import app_commands
+from discord import app_commands, TextChannel
+
+logger = logging.getLogger("command")
 
 
 class CommandGroup(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.auto_delete_channels = {}
-        self.message_delete_tasks = {}
+        self.auto_delete_channels: dict[int, float] = {}
+        self.message_delete_tasks: dict[int, asyncio.Task] = {}
 
     def cog_unload(self) -> None:
         for task in self.message_delete_tasks.values():
             task.cancel()
-
-    async def _update_channel_name(self, channel_id: int, duration_str: str = None) -> None:
-        channel = self.bot.get_channel(channel_id)
-        if channel is None:
-            return
-
-        original_name = channel.name
-
-        if '| ⏱️' in original_name:
-            original_name = original_name.split('┃⏱️')[0]
-
-        new_name = original_name
-        if duration_str:
-            new_name = f"{original_name}┃⏱️{duration_str}"
-
-        if new_name != channel.name:
-            try:
-                await channel.edit(name=new_name)
-            except Exception as e:
-                print(f"알 수 없는 오류 발생: 채널 '{original_name}' 이름 변경 실패: {e}")
-
-
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -59,13 +40,50 @@ class CommandGroup(commands.Cog):
                     except discord.Forbidden:
                         pass
                     except Exception as ue:
-                        print(f"Error deleting message: {ue}")
+                        logger.error(f"Error deleting message: {ue}")
                     finally:
                         if message.id in self.message_delete_tasks:
                             del self.message_delete_tasks[message.id]
 
             task = asyncio.create_task(delete_message_after_delay())
             self.message_delete_tasks[message.id] = task
+
+    @app_commands.command(
+        name="ghostmode",
+        description="Hide guild members nicknames from the server. (anti-capture)",
+    )
+    async def nickname_ghost_mode(
+        self,
+        interaction: discord.Interaction,
+    ) -> None:
+        await interaction.response.defer()
+        target_guild = interaction.guild
+
+        if not target_guild:
+            await interaction.followup.send(
+                "This command can only be used in a server.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            for member in target_guild.members:
+                if member.nick:
+                    await member.edit(nick=None)
+            await interaction.followup.send(
+                "## All nicknames have been cleared from the server.",
+            )
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "I do not have permission to change nicknames in this server.",
+                ephemeral=True,
+            )
+        except Exception as e:
+            logger.error(f"Error clearing nicknames: {e}")
+            await interaction.followup.send(
+                f"An error occurred: {str(e)}",
+                ephemeral=True,
+            )
 
     @app_commands.command(
         name="auto-delete",
@@ -77,16 +95,15 @@ class CommandGroup(commands.Cog):
         time: str = "5m",
     ) -> None:
         await interaction.response.defer()
-        target_channel_id = interaction.channel_id
+        target_channel: TextChannel = interaction.channel
 
         time_command = time.lower()
 
         if time_command == "off":
-            if target_channel_id in self.auto_delete_channels:
-                del self.auto_delete_channels[target_channel_id]
-                await self._update_channel_name(target_channel_id, None)
+            if target_channel.id in self.auto_delete_channels:
+                del self.auto_delete_channels[target_channel.id]
                 await interaction.followup.send(
-                    f"Auto-delete has been **disabled** for this channel.",
+                    f"## Auto-delete has been **disabled** for this channel.",
                 )
             else:
                 await interaction.followup.send(
@@ -101,6 +118,8 @@ class CommandGroup(commands.Cog):
                 seconds = int(time[:-1]) * 60
             elif time_command.endswith("h"):
                 seconds = int(time[:-1]) * 3600
+            elif time_command.endswith("d"):
+                seconds = int(time[:-1]) * 86400
             else:
                 raise ValueError(
                     "Invalid time format. Use '5s', '5m', or '5h'. Use 'off' to disable."
@@ -111,25 +130,27 @@ class CommandGroup(commands.Cog):
                     "Time must be greater than 0 (or use 'off' to disable)."
                 )
 
-            self.auto_delete_channels[target_channel_id] = seconds
-            await self._update_channel_name(target_channel_id, time)
+            if seconds > 172800:  # 2 days in seconds
+                raise ValueError("Maximum time limit is 2 days (172800 seconds).")
+
+            self.auto_delete_channels[target_channel.id] = seconds
             await interaction.followup.send(
-                f"Auto-delete has been set to **{time}** for this channel.",
+                f"## Auto-delete has been set to **{time}** for this channel.",
             )
 
         except ValueError as ve:
+            logger.error(f"ValueError in auto-delete command: {ve}")
             await interaction.followup.send(
                 content=str(ve),
             )
         except Exception as e:
+            logger.error(f"Error in auto-delete command: {e}")
             await interaction.followup.send(
                 content=f"An error occurred: {str(e)}",
                 ephemeral=True,
             )
 
 
-
-
 async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(CommandGroup(bot), override=True)
-    print("loaded command group")
+    await bot.add_cog(CommandGroup(bot))
+    logger.info("CommandGroup cog loaded successfully.")
