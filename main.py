@@ -17,6 +17,9 @@ class Sparkle(commands.Bot):
     def __init__(self) -> None:
         allowed_mentions = AllowedMentions(roles=False, everyone=False, users=True)
         intents = Intents.default()
+        intents.message_content = True
+        intents.members = True
+        intents.guilds = True
         super().__init__(
             command_prefix=os.urandom(10).hex(),
             pm_help=None,
