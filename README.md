@@ -1,6 +1,11 @@
 # Sparkle
 Sparkle, A Discord Bot for Private &amp; Temporary Conversations
 
+
+
+https://github.com/user-attachments/assets/aeb947c3-dac5-4aef-9c95-5e32410af55a
+
+
 ## How to use?
 ### 1.Invite Sparkle to Your Server
 [Invite Link](https://github.com/h053698/Sparkle)
